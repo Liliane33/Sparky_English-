@@ -31,16 +31,6 @@ const App: React.FC = () => {
     localStorage.setItem('bumble_progress', JSON.stringify(newProgress));
   };
 
-  const playSound = (url?: string) => {
-    if (!url) return;
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.play().catch(e => console.log("Audio play blocked", e));
-  };
-
   const handleParentGate = () => {
     const a = Math.floor(Math.random() * 10) + 1;
     const b = Math.floor(Math.random() * 10) + 1;
@@ -58,13 +48,14 @@ const App: React.FC = () => {
   };
 
   const startLessonChat = (lesson: Lesson, item?: any) => {
+    // Si on clique sur un item précis, on demande à Bumble de se présenter PUIS de parler de l'objet
     const prompt = item 
-      ? `The child just clicked on "${item.english}" (${item.french}). Guide them to repeat it. If they say "${item.french}", acknowledge it and ask for "${item.english}".`
-      : `The child is starting the "${lesson.title}" lesson. Introduce the theme in French first, then teach words: ${lesson.items.map(i => i.english).join(', ')}.`;
+      ? `Start with your greeting flow: "Coucou ! Comment tu vas ?". After the child answers, talk about the "${item.english}" (${item.french}). Explain what it is and ask the child to repeat "${item.english}" after you.`
+      : `Start with your greeting flow: "Coucou ! Comment tu vas ?". After the greeting, introduce the "${lesson.title}" lesson to ${username}.`;
     
     const instruction = item
-      ? `Explique en français : "C'est un ${item.french} ! On dit : ${item.english}. À toi !"`
-      : `Dis en français : "Coucou ! On va apprendre ${lesson.frenchTitle} ! C'est parti !"`;
+      ? `Coucou ! Comment tu vas aujourd'hui ? On va découvrir le ${item.french} !`
+      : `Coucou ! Comment tu vas aujourd'hui ? On va apprendre plein de choses sur ${lesson.frenchTitle} !`;
 
     setChatContext({ prompt, instruction });
     setIsChatting(true);
@@ -146,7 +137,7 @@ const App: React.FC = () => {
         <button
           onClick={() => {
             setChatContext({ 
-              prompt: `A friendly, human-like chat with ${username}. You MUST start by saying: "Coucou ${username} ! Comment tu vas aujourd'hui ?". If they say they are doing well ("Bien", "Ça va"), you MUST reply that you are doing great too ("Moi aussi je vais très bien !"). Be a real buddy!`, 
+              prompt: `Start with your greeting flow: "Coucou ! Comment tu vas ?". Then reply that you are doing great too. Then just be a fun buddy.`, 
               instruction: `Coucou ${username} ! Comment tu vas aujourd'hui ?` 
             });
             setIsChatting(true);
@@ -159,23 +150,9 @@ const App: React.FC = () => {
             <span className="block text-lg font-medium opacity-80 italic">Discute avec Bumble</span>
           </div>
         </button>
-        <button
-          onClick={() => setView(AppView.SONGS)}
-          className="bg-purple-500 p-10 rounded-[50px] shadow-2xl text-white transform transition hover:scale-105 active:scale-95 flex flex-col items-center justify-center space-y-4 border-b-[12px] border-black/20"
-        >
-          <span className="text-8xl">🎵</span>
-          <div className="text-center">
-            <span className="block text-3xl font-bold">Sing Songs</span>
-            <span className="block text-lg font-medium opacity-80 italic">Chansons</span>
-          </div>
-        </button>
       </section>
 
       <footer className="pt-20 flex justify-center gap-6">
-        <button onClick={() => setView(AppView.LOGIN)} className="text-gray-400 font-bold flex items-center gap-3 border-4 border-gray-200 px-6 py-3 rounded-full hover:bg-white bg-white/50">
-          <span>🚪</span>
-          <span>Changer de profil</span>
-        </button>
         <button onClick={handleParentGate} className="text-gray-500 font-bold flex items-center gap-3 border-4 border-gray-200 px-10 py-4 rounded-full hover:bg-white bg-white/50">
           <span className="text-2xl">🔒</span>
           <span className="text-xl uppercase tracking-widest">Espace Parents</span>
@@ -188,7 +165,7 @@ const App: React.FC = () => {
     if (!selectedLesson) return null;
     return (
       <div className="min-h-screen bg-white p-6 md:p-12">
-        <button onClick={() => { setView(AppView.HOME); if(audioRef.current) audioRef.current.pause(); }} className="mb-10 text-3xl font-bold text-blue-500 flex items-center gap-3">
+        <button onClick={() => setView(AppView.HOME)} className="mb-10 text-3xl font-bold text-blue-500 flex items-center gap-3">
           <span className="bg-blue-100 p-3 rounded-full">⬅️</span> <span>Retour</span>
         </button>
 
@@ -207,78 +184,25 @@ const App: React.FC = () => {
                 key={idx}
                 className="bg-yellow-50 rounded-[40px] p-10 flex flex-col items-center shadow-lg hover:shadow-2xl transition-all group cursor-pointer border-4 border-transparent hover:border-yellow-200"
                 onClick={() => {
-                  playSound(item.audioUrl);
                   const newProgress = { ...progress, wordsLearned: [...new Set([...progress.wordsLearned, item.english])] };
                   saveProgress(newProgress);
-                  // On laisse Bumble parler après un petit délai ou via interaction directe
+                  startLessonChat(selectedLesson, item);
                 }}
               >
                 <div className="relative mb-8">
                   <img src={item.imageUrl} alt={item.english} className="w-64 h-64 rounded-[40px] object-cover shadow-xl group-hover:scale-105 transition" />
-                  <div className="absolute -bottom-4 -right-4 bg-white p-4 rounded-full shadow-lg text-3xl animate-pulse">🔊</div>
+                  <div className="absolute -bottom-4 -right-4 bg-white p-4 rounded-full shadow-lg text-3xl animate-pulse">🐝</div>
                 </div>
                 <h3 className="text-6xl text-blue-600 mb-2">{item.english}</h3>
                 <p className="text-2xl text-gray-500 font-bold uppercase">{item.french}</p>
               </div>
             ))}
           </div>
-
-          <div className="mt-24 pb-20 flex flex-col items-center">
-            <button 
-              onClick={() => startLessonChat(selectedLesson)}
-              className="bg-green-500 hover:bg-green-600 text-white font-black py-8 px-16 rounded-full text-4xl shadow-[0_12px_0_rgb(21,128,61)] transition-all active:translate-y-2 active:shadow-none flex items-center gap-6"
-            >
-              <span>JOUER AVEC BUMBLE</span>
-              <span className="text-6xl">💬</span>
-            </button>
-          </div>
         </div>
       </div>
     );
   };
 
-  const renderSongs = () => (
-    <div className="min-h-screen bg-purple-50 p-6 md:p-12">
-        <button onClick={() => { setView(AppView.HOME); if(audioRef.current) audioRef.current.pause(); setCurrentSong(null); }} className="mb-10 text-3xl font-bold text-purple-500 flex items-center gap-3">
-          <span className="bg-purple-100 p-3 rounded-full">⬅️</span> <span>Retour</span>
-        </button>
-
-        <div className="max-w-5xl mx-auto">
-            <h2 className="text-6xl text-purple-600 mb-12 text-center">Sing Along! 🎵</h2>
-            
-            {currentSong && (
-              <div className="mb-12 p-8 bg-white rounded-[40px] shadow-xl flex flex-col items-center animate-bounce">
-                <span className="text-8xl mb-4">{currentSong.icon}</span>
-                <p className="text-2xl font-black text-purple-600">Playing: {currentSong.title}</p>
-                <button onClick={() => { if(audioRef.current) audioRef.current.pause(); setCurrentSong(null); }} className="mt-4 text-red-500 font-bold underline">Stop</button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {SONGS.map((song) => (
-                    <button 
-                        key={song.id}
-                        onClick={() => {
-                            setCurrentSong(song);
-                            playSound(song.audioUrl);
-                            setChatContext({
-                                prompt: `Dance and sing with ${username}! The song "${song.title}" is playing. Say something encouraging like "Yay! I love this song!" or "Dance with me!" in both French and English.`,
-                                instruction: `Wouah ! J'adore cette chanson "${song.title}" ! On danse ?`
-                            });
-                            setIsChatting(true);
-                        }}
-                        className={`${song.color} p-12 rounded-[50px] shadow-xl text-white flex items-center gap-8 transform transition hover:scale-105 border-b-[10px] border-black/20`}
-                    >
-                        <span className="text-7xl">{song.icon}</span>
-                        <span className="text-4xl font-black">{song.title}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-    </div>
-  );
-
-  // Fix: Implemented missing renderParentGate
   const renderParentGate = () => (
     <div className="min-h-screen flex items-center justify-center p-6 bg-blue-50">
       <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full text-center border-t-[16px] border-blue-400">
@@ -292,79 +216,35 @@ const App: React.FC = () => {
           value={parentGateAnswer}
           onChange={(e) => setParentGateAnswer(e.target.value)}
           className="w-full text-center text-4xl font-black p-6 border-4 border-blue-100 rounded-[30px] focus:border-blue-400 focus:outline-none mb-8"
-          placeholder="Réponse"
+          placeholder="?"
         />
-        <div className="flex gap-4">
-          <button 
-            onClick={() => setView(AppView.HOME)}
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-black py-4 rounded-[30px] text-xl transition-all"
-          >
-            ANNULER
-          </button>
-          <button 
-            onClick={checkParentGate}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-[30px] text-xl shadow-[0_8px_0_rgb(37,99,235)] transition-all active:translate-y-2 active:shadow-none"
-          >
-            VALIDER
-          </button>
-        </div>
+        <button 
+          onClick={checkParentGate}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-[30px] text-xl shadow-[0_8px_0_rgb(37,99,235)] transition-all active:translate-y-2 active:shadow-none"
+        >
+          VALIDER
+        </button>
       </div>
     </div>
   );
 
-  // Fix: Implemented missing renderParentDashboard
   const renderParentDashboard = () => (
     <div className="min-h-screen bg-gray-50 p-6 md:p-12">
       <div className="max-w-4xl mx-auto bg-white rounded-[60px] shadow-2xl p-12 border-t-[20px] border-indigo-500">
         <div className="flex justify-between items-center mb-12">
           <h2 className="text-5xl font-black text-gray-800">Tableau de Bord</h2>
-          <button 
-            onClick={() => setView(AppView.HOME)}
-            className="bg-gray-100 p-4 rounded-full text-3xl hover:bg-gray-200 transition"
-          >
-            🏠
-          </button>
+          <button onClick={() => setView(AppView.HOME)} className="bg-gray-100 p-4 rounded-full text-3xl">🏠</button>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
-          <div className="bg-indigo-50 p-10 rounded-[50px] border-4 border-indigo-100">
-            <span className="text-5xl mb-4 block">⭐</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          <div className="bg-indigo-50 p-10 rounded-[50px]">
             <h3 className="text-2xl font-bold text-indigo-900 mb-2">Mots appris</h3>
             <p className="text-7xl font-black text-indigo-600">{progress.wordsLearned.length}</p>
           </div>
-          <div className="bg-emerald-50 p-10 rounded-[50px] border-4 border-emerald-100">
-            <span className="text-5xl mb-4 block">💬</span>
-            <h3 className="text-2xl font-bold text-emerald-900 mb-2">Sessions avec Bumble</h3>
+          <div className="bg-emerald-50 p-10 rounded-[50px]">
+            <h3 className="text-2xl font-bold text-emerald-900 mb-2">Sessions Bumble</h3>
             <p className="text-7xl font-black text-emerald-600">{progress.sessionsCompleted}</p>
           </div>
         </div>
-
-        <div className="bg-gray-50 p-10 rounded-[50px]">
-          <h3 className="text-2xl font-bold text-gray-700 mb-6 uppercase tracking-widest">Mots maîtrisés :</h3>
-          <div className="flex flex-wrap gap-4">
-            {progress.wordsLearned.length > 0 ? (
-              progress.wordsLearned.map((word, idx) => (
-                <span key={idx} className="bg-white px-6 py-3 rounded-full text-xl font-bold text-gray-600 shadow-sm border-2 border-gray-100 capitalize">
-                  {word}
-                </span>
-              ))
-            ) : (
-              <p className="text-gray-400 italic">Pas encore de mots appris !</p>
-            )}
-          </div>
-        </div>
-
-        <button 
-          onClick={() => {
-            if (confirm("Réinitialiser toute la progression ?")) {
-                localStorage.removeItem('bumble_progress');
-                setProgress({ wordsLearned: [], sessionsCompleted: 0 });
-            }
-          }}
-          className="mt-12 text-red-400 font-bold hover:text-red-600 underline"
-        >
-          Réinitialiser la progression
-        </button>
       </div>
     </div>
   );
@@ -374,7 +254,6 @@ const App: React.FC = () => {
       {view === AppView.LOGIN && renderLogin()}
       {view === AppView.HOME && renderHome()}
       {view === AppView.LESSON && renderLesson()}
-      {view === AppView.SONGS && renderSongs()}
       {view === AppView.PARENT_GATE && renderParentGate()}
       {view === AppView.PARENT_DASHBOARD && renderParentDashboard()}
       
