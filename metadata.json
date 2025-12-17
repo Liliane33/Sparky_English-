@@ -1,0 +1,7 @@
+{
+  "name": "Sparky_English ",
+  "description": "A playful AI-powered English learning app for toddlers (3-5 years) featuring interactive voice lessons, thematic activities, and a friendly AI mascot named Sparky.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
