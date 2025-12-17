@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
-import { createPcmBlob, decode, decodeAudioData } from '../services/audioService';
-import Mascot from './Mascot';
+import { createPcmBlob, decode, decodeAudioData } from '../services/audioService.ts';
+import Mascot from './Mascot.tsx';
 
 interface SparkyVoiceProps {
   onClose: () => void;
@@ -27,6 +27,12 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
       
       const inCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      
+      // Crucial : Débloquer l'audio sur certains navigateurs
+      if (outCtx.state === 'suspended') {
+        await outCtx.resume();
+      }
+
       audioContextRef.current = inCtx;
       outputAudioContextRef.current = outCtx;
 

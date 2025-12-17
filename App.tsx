@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { AppView, Lesson, Progress } from './types.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppView, Lesson, Progress, Song } from './types.ts';
 import { LESSONS, SONGS } from './constants.tsx';
 import Mascot from './components/Mascot.tsx';
 import SparkyVoice from './components/SparkyVoice.tsx';
@@ -13,7 +13,10 @@ const App: React.FC = () => {
   const [parentGateEquation, setParentGateEquation] = useState<{a: number, b: number}>({a: 0, b: 0});
   const [isChatting, setIsChatting] = useState(false);
   const [chatContext, setChatContext] = useState<{ prompt: string, instruction: string } | null>(null);
+  const [currentSong, setCurrentSong] = useState<Song | null>(null);
   
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   // Login State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +29,16 @@ const App: React.FC = () => {
   const saveProgress = (newProgress: Progress) => {
     setProgress(newProgress);
     localStorage.setItem('bumble_progress', JSON.stringify(newProgress));
+  };
+
+  const playSound = (url?: string) => {
+    if (!url) return;
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.play().catch(e => console.log("Audio play blocked", e));
   };
 
   const handleParentGate = () => {
@@ -175,7 +188,7 @@ const App: React.FC = () => {
     if (!selectedLesson) return null;
     return (
       <div className="min-h-screen bg-white p-6 md:p-12">
-        <button onClick={() => setView(AppView.HOME)} className="mb-10 text-3xl font-bold text-blue-500 flex items-center gap-3">
+        <button onClick={() => { setView(AppView.HOME); if(audioRef.current) audioRef.current.pause(); }} className="mb-10 text-3xl font-bold text-blue-500 flex items-center gap-3">
           <span className="bg-blue-100 p-3 rounded-full">⬅️</span> <span>Retour</span>
         </button>
 
@@ -194,9 +207,10 @@ const App: React.FC = () => {
                 key={idx}
                 className="bg-yellow-50 rounded-[40px] p-10 flex flex-col items-center shadow-lg hover:shadow-2xl transition-all group cursor-pointer border-4 border-transparent hover:border-yellow-200"
                 onClick={() => {
+                  playSound(item.audioUrl);
                   const newProgress = { ...progress, wordsLearned: [...new Set([...progress.wordsLearned, item.english])] };
                   saveProgress(newProgress);
-                  startLessonChat(selectedLesson, item);
+                  // On laisse Bumble parler après un petit délai ou via interaction directe
                 }}
               >
                 <div className="relative mb-8">
@@ -225,20 +239,31 @@ const App: React.FC = () => {
 
   const renderSongs = () => (
     <div className="min-h-screen bg-purple-50 p-6 md:p-12">
-        <button onClick={() => setView(AppView.HOME)} className="mb-10 text-3xl font-bold text-purple-500 flex items-center gap-3">
+        <button onClick={() => { setView(AppView.HOME); if(audioRef.current) audioRef.current.pause(); setCurrentSong(null); }} className="mb-10 text-3xl font-bold text-purple-500 flex items-center gap-3">
           <span className="bg-purple-100 p-3 rounded-full">⬅️</span> <span>Retour</span>
         </button>
 
         <div className="max-w-5xl mx-auto">
             <h2 className="text-6xl text-purple-600 mb-12 text-center">Sing Along! 🎵</h2>
+            
+            {currentSong && (
+              <div className="mb-12 p-8 bg-white rounded-[40px] shadow-xl flex flex-col items-center animate-bounce">
+                <span className="text-8xl mb-4">{currentSong.icon}</span>
+                <p className="text-2xl font-black text-purple-600">Playing: {currentSong.title}</p>
+                <button onClick={() => { if(audioRef.current) audioRef.current.pause(); setCurrentSong(null); }} className="mt-4 text-red-500 font-bold underline">Stop</button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {SONGS.map((song) => (
                     <button 
                         key={song.id}
                         onClick={() => {
+                            setCurrentSong(song);
+                            playSound(song.audioUrl);
                             setChatContext({
-                                prompt: `Sing the lyrics of "${song.title}" slowly for the child to follow. Encouraging tone.`,
-                                instruction: `C'est parti ! Chantons ensemble "${song.title}" !`
+                                prompt: `Dance and sing with ${username}! The song "${song.title}" is playing. Say something encouraging like "Yay! I love this song!" or "Dance with me!" in both French and English.`,
+                                instruction: `Wouah ! J'adore cette chanson "${song.title}" ! On danse ?`
                             });
                             setIsChatting(true);
                         }}
@@ -253,52 +278,93 @@ const App: React.FC = () => {
     </div>
   );
 
+  // Fix: Implemented missing renderParentGate
   const renderParentGate = () => (
     <div className="min-h-screen flex items-center justify-center p-6 bg-blue-50">
-      <div className="bg-white p-14 rounded-[60px] shadow-2xl max-w-lg w-full text-center border-t-[16px] border-blue-500">
-        <h2 className="text-4xl mb-6 text-blue-600">Espace Parents 🔒</h2>
-        <p className="text-gray-500 mb-10 text-xl font-medium">Résous ce calcul pour entrer :</p>
-        <div className="text-7xl font-black text-blue-800 mb-10 bg-blue-50 p-10 rounded-full">{parentGateEquation.a} + {parentGateEquation.b}</div>
-        <input type="number" value={parentGateAnswer} onChange={(e) => setParentGateAnswer(e.target.value)} className="w-full text-center text-5xl font-black p-6 border-8 border-blue-100 rounded-[30px] mb-10" placeholder="?" autoFocus />
-        <div className="flex gap-6">
-          <button onClick={() => setView(AppView.HOME)} className="flex-1 py-6 text-2xl font-black text-gray-400 bg-gray-100 rounded-[30px]">Annuler</button>
-          <button onClick={checkParentGate} className="flex-1 py-6 text-2xl font-black text-white bg-blue-500 rounded-[30px]">Entrer</button>
+      <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full text-center border-t-[16px] border-blue-400">
+        <h2 className="text-4xl font-black text-gray-800 mb-4">Espace Parents</h2>
+        <p className="text-xl text-gray-500 mb-8 font-bold">Prouve que tu es un adulte !</p>
+        <div className="bg-blue-100 p-8 rounded-[30px] mb-8 text-5xl font-black text-blue-600">
+          {parentGateEquation.a} + {parentGateEquation.b} = ?
+        </div>
+        <input 
+          type="number"
+          value={parentGateAnswer}
+          onChange={(e) => setParentGateAnswer(e.target.value)}
+          className="w-full text-center text-4xl font-black p-6 border-4 border-blue-100 rounded-[30px] focus:border-blue-400 focus:outline-none mb-8"
+          placeholder="Réponse"
+        />
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setView(AppView.HOME)}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-black py-4 rounded-[30px] text-xl transition-all"
+          >
+            ANNULER
+          </button>
+          <button 
+            onClick={checkParentGate}
+            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-[30px] text-xl shadow-[0_8px_0_rgb(37,99,235)] transition-all active:translate-y-2 active:shadow-none"
+          >
+            VALIDER
+          </button>
         </div>
       </div>
     </div>
   );
 
+  // Fix: Implemented missing renderParentDashboard
   const renderParentDashboard = () => (
-    <div className="min-h-screen bg-gray-100 p-8 lg:p-16">
-      <div className="max-w-6xl mx-auto bg-white rounded-[60px] shadow-2xl overflow-hidden">
-        <div className="bg-blue-600 p-12 text-white flex justify-between items-center">
-          <h2 className="text-5xl font-black">Tableau de bord</h2>
-          <button onClick={() => setView(AppView.HOME)} className="bg-white text-blue-600 px-10 py-4 rounded-full font-black text-xl">Quitter 🏠</button>
+    <div className="min-h-screen bg-gray-50 p-6 md:p-12">
+      <div className="max-w-4xl mx-auto bg-white rounded-[60px] shadow-2xl p-12 border-t-[20px] border-indigo-500">
+        <div className="flex justify-between items-center mb-12">
+          <h2 className="text-5xl font-black text-gray-800">Tableau de Bord</h2>
+          <button 
+            onClick={() => setView(AppView.HOME)}
+            className="bg-gray-100 p-4 rounded-full text-3xl hover:bg-gray-200 transition"
+          >
+            🏠
+          </button>
         </div>
-        <div className="p-12 lg:p-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-20">
-            <div className="bg-blue-50 p-10 rounded-[40px] flex flex-col items-center">
-              <span className="text-2xl font-black text-blue-600 mb-4 uppercase">Mots Appris</span>
-              <div className="text-8xl font-black text-blue-800">{progress.wordsLearned.length}</div>
-            </div>
-            <div className="bg-green-50 p-10 rounded-[40px] flex flex-col items-center">
-              <span className="text-2xl font-black text-green-600 mb-4 uppercase">Sessions AI</span>
-              <div className="text-8xl font-black text-green-800">{progress.sessionsCompleted}</div>
-            </div>
-            <div className="bg-yellow-50 p-10 rounded-[40px] flex flex-col items-center">
-              <span className="text-2xl font-black text-yellow-600 mb-4 uppercase">Progression</span>
-              <div className="text-8xl font-black text-yellow-800">100%</div>
-            </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
+          <div className="bg-indigo-50 p-10 rounded-[50px] border-4 border-indigo-100">
+            <span className="text-5xl mb-4 block">⭐</span>
+            <h3 className="text-2xl font-bold text-indigo-900 mb-2">Mots appris</h3>
+            <p className="text-7xl font-black text-indigo-600">{progress.wordsLearned.length}</p>
           </div>
-          <section>
-            <h3 className="text-3xl font-black mb-8 text-gray-800 border-l-8 border-yellow-400 pl-6">Vocabulaire acquis</h3>
-            <div className="flex flex-wrap gap-4">
-              {progress.wordsLearned.map((word, i) => (
-                <span key={i} className="bg-white border-4 border-blue-50 px-8 py-4 rounded-3xl text-2xl font-bold text-blue-700 shadow-md">{word} ✅</span>
-              ))}
-            </div>
-          </section>
+          <div className="bg-emerald-50 p-10 rounded-[50px] border-4 border-emerald-100">
+            <span className="text-5xl mb-4 block">💬</span>
+            <h3 className="text-2xl font-bold text-emerald-900 mb-2">Sessions avec Bumble</h3>
+            <p className="text-7xl font-black text-emerald-600">{progress.sessionsCompleted}</p>
+          </div>
         </div>
+
+        <div className="bg-gray-50 p-10 rounded-[50px]">
+          <h3 className="text-2xl font-bold text-gray-700 mb-6 uppercase tracking-widest">Mots maîtrisés :</h3>
+          <div className="flex flex-wrap gap-4">
+            {progress.wordsLearned.length > 0 ? (
+              progress.wordsLearned.map((word, idx) => (
+                <span key={idx} className="bg-white px-6 py-3 rounded-full text-xl font-bold text-gray-600 shadow-sm border-2 border-gray-100 capitalize">
+                  {word}
+                </span>
+              ))
+            ) : (
+              <p className="text-gray-400 italic">Pas encore de mots appris !</p>
+            )}
+          </div>
+        </div>
+
+        <button 
+          onClick={() => {
+            if (confirm("Réinitialiser toute la progression ?")) {
+                localStorage.removeItem('bumble_progress');
+                setProgress({ wordsLearned: [], sessionsCompleted: 0 });
+            }
+          }}
+          className="mt-12 text-red-400 font-bold hover:text-red-600 underline"
+        >
+          Réinitialiser la progression
+        </button>
       </div>
     </div>
   );

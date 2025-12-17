@@ -9,6 +9,14 @@ export enum AppView {
   PARENT_DASHBOARD = 'PARENT_DASHBOARD'
 }
 
+export interface Song {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+  audioUrl: string;
+}
+
 export interface Lesson {
   id: string;
   title: string;
