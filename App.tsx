@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppView, Lesson, Progress } from './types';
-import { LESSONS, SONGS } from './constants';
-import Mascot from './components/Mascot';
-import SparkyVoice from './components/SparkyVoice';
+import { AppView, Lesson, Progress } from './types.ts';
+import { LESSONS, SONGS } from './constants.tsx';
+import Mascot from './components/Mascot.tsx';
+import SparkyVoice from './components/SparkyVoice.tsx';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LOGIN);
@@ -133,7 +133,7 @@ const App: React.FC = () => {
         <button
           onClick={() => {
             setChatContext({ 
-              prompt: `A friendly, human-like chat with ${username}. Start with the greeting: "Coucou ${username} ! Comment tu vas aujourd'hui ?". If they say "Bien", you must respond that you are doing great too. Be a real buddy!`, 
+              prompt: `A friendly, human-like chat with ${username}. You MUST start by saying: "Coucou ${username} ! Comment tu vas aujourd'hui ?". If they say they are doing well ("Bien", "Ça va"), you MUST reply that you are doing great too ("Moi aussi je vais très bien !"). Be a real buddy!`, 
               instruction: `Coucou ${username} ! Comment tu vas aujourd'hui ?` 
             });
             setIsChatting(true);

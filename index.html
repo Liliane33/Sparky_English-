@@ -32,6 +32,10 @@
             75% { transform: rotate(5deg); }
         }
     </style>
+    <script>
+        // Empêche le crash si process.env n'est pas défini par l'environnement de build
+        window.process = window.process || { env: {} };
+    </script>
 <script type="importmap">
 {
   "imports": {
@@ -45,5 +49,6 @@
 </head>
 <body>
     <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
