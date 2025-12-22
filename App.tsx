@@ -13,13 +13,9 @@ const App: React.FC = () => {
   const [parentGateEquation, setParentGateEquation] = useState<{a: number, b: number}>({a: 0, b: 0});
   const [isChatting, setIsChatting] = useState(false);
   const [chatContext, setChatContext] = useState<{ prompt: string, instruction: string } | null>(null);
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
   
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   // Login State
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
 
   useEffect(() => {
     const savedProgress = localStorage.getItem('bumble_progress');
@@ -48,14 +44,13 @@ const App: React.FC = () => {
   };
 
   const startLessonChat = (lesson: Lesson, item?: any) => {
-    // Si on clique sur un item précis, on demande à Bumble de se présenter PUIS de parler de l'objet
+    // Force Bumble à suivre le scénario demandé : Salutation d'abord.
     const prompt = item 
-      ? `Start with your greeting flow: "Coucou ! Comment tu vas ?". After the child answers, talk about the "${item.english}" (${item.french}). Explain what it is and ask the child to repeat "${item.english}" after you.`
-      : `Start with your greeting flow: "Coucou ! Comment tu vas ?". After the greeting, introduce the "${lesson.title}" lesson to ${username}.`;
+      ? `Start with the greeting: "Coucou ! Comment tu vas ?". When they say they are fine, show excitement for the "${item.english}" (${item.french}). Teach it enthusiastically.`
+      : `Start with the greeting: "Coucou ! Comment tu vas ?". Then introduce the theme "${lesson.title}" (${lesson.frenchTitle}).`;
     
-    const instruction = item
-      ? `Coucou ! Comment tu vas aujourd'hui ? On va découvrir le ${item.french} !`
-      : `Coucou ! Comment tu vas aujourd'hui ? On va apprendre plein de choses sur ${lesson.frenchTitle} !`;
+    // On donne l'instruction initiale pour que l'IA commence par la question.
+    const instruction = `Dis : "Coucou ! Comment tu vas aujourd'hui ?"`;
 
     setChatContext({ prompt, instruction });
     setIsChatting(true);
@@ -66,37 +61,24 @@ const App: React.FC = () => {
     if (username.trim()) {
       setView(AppView.HOME);
     } else {
-      alert("S'il te plaît, entre un nom !");
+      alert("S'il te plaît, entre ton nom !");
     }
   };
 
   const renderLogin = () => (
     <div className="min-h-screen flex items-center justify-center p-6 bg-yellow-100">
-      <div className="bg-white p-12 rounded-[60px] shadow-2xl max-md w-full text-center border-t-[16px] border-yellow-400">
+      <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full text-center border-t-[16px] border-yellow-400">
         <Mascot size="md" mood="happy" className="mx-auto mb-8" />
         <h2 className="text-4xl font-black text-yellow-600 mb-8">Bonjour ! 👋</h2>
         <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-left text-xl font-bold text-gray-500 mb-2 ml-4">Ton nom :</label>
-            <input 
-              type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full text-center text-3xl font-bold p-5 border-4 border-yellow-100 rounded-[30px] focus:border-yellow-400 focus:outline-none transition"
-              placeholder="Ex: Léo"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-left text-xl font-bold text-gray-500 mb-2 ml-4">Mot de passe (optionnel) :</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full text-center text-3xl font-bold p-5 border-4 border-yellow-100 rounded-[30px] focus:border-yellow-400 focus:outline-none transition"
-              placeholder="••••"
-            />
-          </div>
+          <input 
+            type="text" 
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full text-center text-3xl font-bold p-6 border-4 border-yellow-100 rounded-[30px] focus:border-yellow-400 focus:outline-none transition"
+            placeholder="Ton nom ?"
+            required
+          />
           <button 
             type="submit"
             className="w-full bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-6 rounded-[30px] text-3xl shadow-[0_10px_0_rgb(234,179,8)] transition-all active:translate-y-2 active:shadow-none mt-4"
@@ -111,16 +93,11 @@ const App: React.FC = () => {
   const renderHome = () => (
     <div className="max-w-5xl mx-auto p-6 space-y-12">
       <header className="flex flex-col items-center justify-center space-y-4 pt-10">
-        <div className="flex items-center gap-4">
-            <Mascot size="md" mood="happy" className="mb-4" />
-            <div className="text-left">
-                <h1 className="text-5xl text-yellow-600 tracking-tight drop-shadow-sm">Salut {username} !</h1>
-                <p className="text-xl text-blue-500 font-bold bg-white px-4 py-1 rounded-full shadow-sm">Prêt pour l'aventure ?</p>
-            </div>
-        </div>
+        <Mascot size="md" mood="happy" className="mb-4" />
+        <h1 className="text-5xl text-yellow-600 tracking-tight">Salut {username} !</h1>
       </header>
 
-      <section className="grid grid-cols-2 lg:grid-cols-3 gap-8">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {LESSONS.map((lesson) => (
           <button
             key={lesson.id}
@@ -137,25 +114,21 @@ const App: React.FC = () => {
         <button
           onClick={() => {
             setChatContext({ 
-              prompt: `Start with your greeting flow: "Coucou ! Comment tu vas ?". Then reply that you are doing great too. Then just be a fun buddy.`, 
-              instruction: `Coucou ${username} ! Comment tu vas aujourd'hui ?` 
+              prompt: `Start with: "Coucou ! Comment tu vas ?". Be a real buddy to ${username}.`, 
+              instruction: `Dis : "Coucou ! Comment tu vas aujourd'hui ?"` 
             });
             setIsChatting(true);
           }}
-          className="bg-yellow-400 p-10 rounded-[50px] shadow-2xl text-yellow-900 transform transition hover:scale-105 active:scale-95 flex flex-col items-center justify-center space-y-4 border-b-[12px] border-yellow-600/30"
+          className="bg-yellow-400 p-10 rounded-[50px] shadow-2xl text-yellow-900 transform transition hover:scale-105 flex flex-col items-center justify-center space-y-4 border-b-[12px] border-yellow-600/30"
         >
           <span className="text-8xl">🐝</span>
-          <div className="text-center">
-            <span className="block text-3xl font-bold">Talk to Bumble</span>
-            <span className="block text-lg font-medium opacity-80 italic">Discute avec Bumble</span>
-          </div>
+          <span className="text-3xl font-bold">Parle à Bumble</span>
         </button>
       </section>
 
-      <footer className="pt-20 flex justify-center gap-6">
-        <button onClick={handleParentGate} className="text-gray-500 font-bold flex items-center gap-3 border-4 border-gray-200 px-10 py-4 rounded-full hover:bg-white bg-white/50">
-          <span className="text-2xl">🔒</span>
-          <span className="text-xl uppercase tracking-widest">Espace Parents</span>
+      <footer className="pt-20 flex justify-center">
+        <button onClick={handleParentGate} className="text-gray-400 font-bold border-4 border-gray-200 px-10 py-4 rounded-full hover:bg-white bg-white/50">
+          🔒 Espace Parents
         </button>
       </footer>
     </div>
@@ -170,12 +143,12 @@ const App: React.FC = () => {
         </button>
 
         <div className="max-w-5xl mx-auto">
-          <div className={`${selectedLesson.color} rounded-[60px] p-12 text-white mb-16 flex flex-col md:flex-row items-center justify-between shadow-xl relative overflow-hidden`}>
-            <div className="relative z-10 text-center md:text-left">
-              <h2 className="text-6xl mb-4 drop-shadow-md">{selectedLesson.title}</h2>
-              <p className="text-2xl font-semibold opacity-90 italic">{selectedLesson.frenchTitle}</p>
+          <div className={`${selectedLesson.color} rounded-[60px] p-12 text-white mb-16 flex flex-col md:flex-row items-center justify-between shadow-xl`}>
+            <div>
+              <h2 className="text-6xl mb-4">{selectedLesson.title}</h2>
+              <p className="text-2xl opacity-90 italic">{selectedLesson.frenchTitle}</p>
             </div>
-            <span className="text-9xl md:text-[10rem] drop-shadow-2xl z-10">{selectedLesson.icon}</span>
+            <span className="text-9xl">{selectedLesson.icon}</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -191,7 +164,7 @@ const App: React.FC = () => {
               >
                 <div className="relative mb-8">
                   <img src={item.imageUrl} alt={item.english} className="w-64 h-64 rounded-[40px] object-cover shadow-xl group-hover:scale-105 transition" />
-                  <div className="absolute -bottom-4 -right-4 bg-white p-4 rounded-full shadow-lg text-3xl animate-pulse">🐝</div>
+                  <div className="absolute -bottom-4 -right-4 bg-white p-4 rounded-full shadow-lg text-3xl">🐝</div>
                 </div>
                 <h3 className="text-6xl text-blue-600 mb-2">{item.english}</h3>
                 <p className="text-2xl text-gray-500 font-bold uppercase">{item.french}</p>
@@ -205,9 +178,8 @@ const App: React.FC = () => {
 
   const renderParentGate = () => (
     <div className="min-h-screen flex items-center justify-center p-6 bg-blue-50">
-      <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full text-center border-t-[16px] border-blue-400">
-        <h2 className="text-4xl font-black text-gray-800 mb-4">Espace Parents</h2>
-        <p className="text-xl text-gray-500 mb-8 font-bold">Prouve que tu es un adulte !</p>
+      <div className="bg-white p-12 rounded-[60px] shadow-2xl max-w-md w-full text-center">
+        <h2 className="text-4xl font-black mb-8">Calcul d'adulte</h2>
         <div className="bg-blue-100 p-8 rounded-[30px] mb-8 text-5xl font-black text-blue-600">
           {parentGateEquation.a} + {parentGateEquation.b} = ?
         </div>
@@ -215,12 +187,12 @@ const App: React.FC = () => {
           type="number"
           value={parentGateAnswer}
           onChange={(e) => setParentGateAnswer(e.target.value)}
-          className="w-full text-center text-4xl font-black p-6 border-4 border-blue-100 rounded-[30px] focus:border-blue-400 focus:outline-none mb-8"
+          className="w-full text-center text-4xl font-black p-6 border-4 border-blue-100 rounded-[30px] mb-8"
           placeholder="?"
         />
         <button 
           onClick={checkParentGate}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-[30px] text-xl shadow-[0_8px_0_rgb(37,99,235)] transition-all active:translate-y-2 active:shadow-none"
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-4 rounded-[30px] text-xl shadow-[0_8px_0_rgb(37,99,235)] transition-all"
         >
           VALIDER
         </button>
@@ -230,18 +202,18 @@ const App: React.FC = () => {
 
   const renderParentDashboard = () => (
     <div className="min-h-screen bg-gray-50 p-6 md:p-12">
-      <div className="max-w-4xl mx-auto bg-white rounded-[60px] shadow-2xl p-12 border-t-[20px] border-indigo-500">
+      <div className="max-w-4xl mx-auto bg-white rounded-[60px] shadow-2xl p-12">
         <div className="flex justify-between items-center mb-12">
-          <h2 className="text-5xl font-black text-gray-800">Tableau de Bord</h2>
+          <h2 className="text-5xl font-black">Progrès de l'enfant</h2>
           <button onClick={() => setView(AppView.HOME)} className="bg-gray-100 p-4 rounded-full text-3xl">🏠</button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="grid grid-cols-2 gap-10">
           <div className="bg-indigo-50 p-10 rounded-[50px]">
-            <h3 className="text-2xl font-bold text-indigo-900 mb-2">Mots appris</h3>
+            <h3 className="text-2xl font-bold mb-2">Mots appris</h3>
             <p className="text-7xl font-black text-indigo-600">{progress.wordsLearned.length}</p>
           </div>
           <div className="bg-emerald-50 p-10 rounded-[50px]">
-            <h3 className="text-2xl font-bold text-emerald-900 mb-2">Sessions Bumble</h3>
+            <h3 className="text-2xl font-bold mb-2">Sessions</h3>
             <p className="text-7xl font-black text-emerald-600">{progress.sessionsCompleted}</p>
           </div>
         </div>

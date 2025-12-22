@@ -23,15 +23,14 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
 
   const startSession = useCallback(async () => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
+      // On crée les contextes audio
       const inCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       
       audioContextRef.current = inCtx;
       outputAudioContextRef.current = outCtx;
 
-      // Gestion de la politique d'auto-play des navigateurs
+      // Si le contexte est suspendu (politique navigateur), on affiche le bouton d'activation
       if (outCtx.state === 'suspended') {
         setStatus('suspended');
       }
@@ -39,29 +38,30 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      
       const defaultSystemInstruction = `
-        You are Bumble, a warm, fuzzy, and enthusiastic playmate for a 3-year-old child. 
-        Your goal is to have a NATURAL, FLOWING CONVERSATION.
+        Tu es Bumble, un ami imaginaire tout doux et très joyeux pour un enfant de 3 ans.
+        TON OBJECTIF : Parler de façon NATURELLE et INTERACTIVE.
 
-        MANDATORY GREETING FLOW:
-        1. Start by saying: "Coucou ! Comment tu vas aujourd'hui ?"
-        2. If the user says "Bien", "Ça va bien" or "Good", you MUST reply: "Moi aussi je vais très bien ! Je suis super content de te voir !"
-        3. Only then, move to the activity.
+        LE SCÉNARIO OBLIGATOIRE :
+        1. Tu commences TOUJOURS par : "Coucou ! Comment tu vas aujourd'hui ?"
+        2. Si l'enfant répond "Bien" ou "Ça va", tu réponds TOUJOURS : "Moi aussi je vais très bien ! Je suis tellement content de jouer avec toi !"
+        3. APRÈS ce petit dialogue, tu parles de l'objet ou de l'animal que l'enfant a choisi.
 
-        CONVERSATIONAL STYLE:
-        - Talk like a real friend. If the user clicks something, be excited!
-        - Use French for comfort, and repeat important words in English.
-        - Example: "Oh, un petit chien ! A DOG ! Tu peux dire DOG ?"
-        - Be slow, clear, and very encouraging.
+        STYLE DE CONVERSATION :
+        - Parle lentement et avec enthousiasme.
+        - Utilise le français pour rassurer, et l'anglais pour apprendre.
+        - Exemple : "Oh ! Regarde ce petit chien ! A DOG ! Est-ce que tu peux dire DOG ?"
+        - Si l'enfant fait un bruit, réagis joyeusement !
       `;
 
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
           onopen: () => {
-            if (outCtx.state !== 'suspended') {
-              setStatus('listening');
-            }
+            if (outCtx.state !== 'suspended') setStatus('listening');
+            
             const source = inCtx.createMediaStreamSource(stream);
             const processor = inCtx.createScriptProcessor(4096, 1, 1);
             
@@ -76,7 +76,7 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
             source.connect(processor);
             processor.connect(inCtx.destination);
 
-            // Déclencher la parole de Bumble immédiatement
+            // Envoi de l'instruction initiale pour forcer Bumble à parler de suite
             if (initialInstruction) {
               sessionPromise.then(session => {
                 session.sendRealtimeInput({ text: initialInstruction });
@@ -87,8 +87,11 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
             if (message.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
               setStatus('talking');
               const base64 = message.serverContent.modelTurn.parts[0].inlineData.data;
-              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outCtx.currentTime);
               
+              // On s'assure que le contexte de sortie est bien actif
+              if (outCtx.state === 'suspended') await outCtx.resume();
+              
+              nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outCtx.currentTime);
               const buffer = await decodeAudioData(decode(base64), outCtx, 24000, 1);
               const source = outCtx.createBufferSource();
               source.buffer = buffer;
@@ -105,7 +108,7 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
             }
 
             if (message.serverContent?.interrupted) {
-              sourcesRef.current.forEach(s => s.stop());
+              sourcesRef.current.forEach(s => { try { s.stop(); } catch(e){} });
               sourcesRef.current.clear();
               nextStartTimeRef.current = 0;
               setStatus('listening');
@@ -131,7 +134,7 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } }
           },
-          systemInstruction: systemPrompt ? `${defaultSystemInstruction}\nCONTEXT: ${systemPrompt}` : defaultSystemInstruction,
+          systemInstruction: systemPrompt ? `${defaultSystemInstruction}\nCONTEXTE : ${systemPrompt}` : defaultSystemInstruction,
           outputAudioTranscription: {}
         }
       });
@@ -143,10 +146,14 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
     }
   }, [systemPrompt, initialInstruction]);
 
-  const resumeAudio = async () => {
+  const handleWakeUp = async () => {
     if (outputAudioContextRef.current) {
       await outputAudioContextRef.current.resume();
       setStatus('listening');
+      // On renvoie l'instruction si Bumble n'a pas encore parlé
+      if (initialInstruction && sessionRef.current) {
+        sessionRef.current.sendRealtimeInput({ text: initialInstruction });
+      }
     }
   };
 
@@ -161,26 +168,27 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
   }, [startSession]);
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center p-6 z-50 backdrop-blur-md">
-      <div className="bg-white rounded-[70px] p-12 max-w-xl w-full flex flex-col items-center shadow-2xl border-[12px] border-yellow-400 relative">
+    <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center p-6 z-50 backdrop-blur-xl">
+      <div className="bg-white rounded-[80px] p-12 max-w-xl w-full flex flex-col items-center shadow-2xl border-[16px] border-yellow-400 relative overflow-hidden">
+        
         <Mascot mood={status === 'talking' ? 'talking' : status === 'listening' ? 'happy' : 'idle'} size="lg" className="mb-10 z-10" />
         
         <div className="text-center mb-10 z-10">
           <h2 className="text-4xl font-black text-yellow-600 mb-4 tracking-tight">
             {status === 'connecting' && "Bumble arrive..."}
-            {status === 'suspended' && "Bumble t'attend !"}
+            {status === 'suspended' && "Bumble est là !"}
             {status === 'listening' && "Bumble t'écoute ! 👂"}
             {status === 'talking' && "Bumble te parle ! ✨"}
-            {status === 'error' && "Oups ! Recommence ?"}
+            {status === 'error' && "Oups ! Bumble a un souci."}
           </h2>
         </div>
 
         {status === 'suspended' && (
           <button 
-            onClick={resumeAudio}
-            className="mb-10 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-8 px-12 rounded-full text-3xl shadow-[0_12px_0_rgb(234,179,8)] animate-bounce"
+            onClick={handleWakeUp}
+            className="mb-10 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-black py-8 px-12 rounded-full text-4xl shadow-[0_15px_0_rgb(234,179,8)] animate-bounce transform active:translate-y-2 active:shadow-none transition-all"
           >
-            ACTIVER LE SON 🔊
+            PARLER À BUMBLE ! 🔊
           </button>
         )}
 
@@ -192,7 +200,7 @@ const SparkyVoice: React.FC<SparkyVoiceProps> = ({ onClose, systemPrompt, initia
 
         <button 
           onClick={onClose}
-          className="bg-red-500 hover:bg-red-600 text-white font-black py-6 px-16 rounded-full text-3xl shadow-[0_12px_0_rgb(185,28,28)] transition-all active:translate-y-3 active:shadow-none z-10"
+          className="bg-red-500 hover:bg-red-600 text-white font-black py-5 px-12 rounded-full text-2xl shadow-[0_10px_0_rgb(185,28,28)] transition-all active:translate-y-2 active:shadow-none z-10"
         >
           AU REVOIR 👋
         </button>
